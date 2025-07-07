@@ -1,4 +1,3 @@
-# fxopen_handler.py
 import time
 import hmac
 import hashlib
