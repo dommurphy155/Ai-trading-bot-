@@ -1,21 +1,34 @@
+# screenshots.py
+
+import asyncio
+from playwright.async_api import async_playwright
 import os
-import time
 from datetime import datetime
-import MetaTrader5 as mt5
-from matplotlib import pyplot as plt
 
-class Screenshot:
-    def __init__(self, out_dir="screenshots"):
-        os.makedirs(out_dir, exist_ok=True)
-        self.out_dir = out_dir
+async def capture_screenshot(url: str, output_dir: str = "screenshots") -> str:
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    def grab_chart(self, symbol="EURUSD"):
-        rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M1, 0, 60)
-        times = [datetime.fromtimestamp(r[0]) for r in rates]
-        closes = [r[4] for r in rates]
-        plt.figure()
-        plt.plot(times, closes)
-        path = os.path.join(self.out_dir, f"{symbol}_{int(time.time())}.png")
-        plt.savefig(path, bbox_inches="tight")
-        plt.close()
-        return path
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"screenshot_{timestamp}.png"
+    filepath = os.path.join(output_dir, filename)
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
+        page = await context.new_page()
+        await page.goto(url, wait_until="networkidle")
+        await page.screenshot(path=filepath, full_page=True)
+        await browser.close()
+
+    return filepath
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) != 2:
+        print("Usage: python screenshots.py <url>")
+        exit(1)
+
+    url = sys.argv[1]
+    path = asyncio.run(capture_screenshot(url))
+    print(f"Screenshot saved to {path}")
