@@ -11,6 +11,6 @@ python-dateutil
 numpy
 pandas
 scipy
-sklearn
+scikit-learn
 matplotlib
 # Removed MetaTrader5 - no support on your env
