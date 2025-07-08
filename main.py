@@ -35,6 +35,7 @@ BASE_URL = "https://restapi.fxopen.com:8443"
 # Telegram Bot instance for direct sends outside TelegramBot class
 bot = Bot(token=TG_TOKEN)
 
+
 def hmac_auth(endpoint, payload=None):
     nonce = str(int(time.time() * 1000))
     body = json.dumps(payload) if payload else ""
@@ -50,6 +51,7 @@ def hmac_auth(endpoint, payload=None):
     }
     return headers
 
+
 def get_account_info():
     endpoint = f"/accounts/{FXOPEN_LOGIN}"
     url = BASE_URL + endpoint
@@ -58,8 +60,10 @@ def get_account_info():
     if r.status_code == 200:
         return r.json()
     else:
-        logging.error(f"FXOpen account info fetch failed: {r.status_code} {r.text}")
+        logging.error(
+            f"FXOpen account info fetch failed: {r.status_code} {r.text}")
         return {}
+
 
 async def send_update():
     account = get_account_info()
@@ -80,24 +84,27 @@ async def send_update():
     except Exception as e:
         logging.error(f"Failed to send Telegram update: {e}")
 
+
 async def periodic_update(interval_sec=60):
     while True:
         await send_update()
         await asyncio.sleep(interval_sec)
+
 
 async def market_scanner(trader):
     while True:
         try:
             await trader.evaluate_and_execute()
 
+
 async def main():
     load_dotenv()
-    
+
     # Initialize modules
     ai = AIAnalyzer()
     earnings = EarningsTracker()
     ss = Screenshot()
-    
+
     # Set up Telegram bot and trader
     bot = TelegramBot(None, earnings)
     trader = Trader(ai, earnings, ss, bot)

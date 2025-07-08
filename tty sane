@@ -1,0 +1,57 @@
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/__pycache__/__init__.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/__pycache__/__init__.cpython-38.pyc[m
+[1mindex 707b5c1..028ea22 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/__pycache__/__init__.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/__pycache__/__init__.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/__init__.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/__init__.cpython-38.pyc[m
+[1mindex eb2fb69..cbc195e 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/__init__.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/__init__.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/build_env.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/build_env.cpython-38.pyc[m
+[1mindex a751ad4..d707ec7 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/build_env.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/build_env.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/cache.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/cache.cpython-38.pyc[m
+[1mindex c64f196..bd06713 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/cache.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/cache.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/configuration.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/configuration.cpython-38.pyc[m
+[1mindex 532c825..4de8ec0 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/configuration.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/configuration.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/exceptions.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/exceptions.cpython-38.pyc[m
+[1mindex 816a856..548fcfd 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/exceptions.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/exceptions.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/pyproject.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/pyproject.cpython-38.pyc[m
+[1mindex be19db5..478019e 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/pyproject.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/pyproject.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/self_outdated_check.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/self_outdated_check.cpython-38.pyc[m
+[1mindex 5b23d68..7ed2d5c 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/self_outdated_check.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/self_outdated_check.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/wheel_builder.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/wheel_builder.cpython-38.pyc[m
+[1mindex 31f052d..bc5b8e7 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/wheel_builder.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/__pycache__/wheel_builder.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/__init__.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/__init__.cpython-38.pyc[m
+[1mindex 4f61c25..2b0c7ce 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/__init__.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/__init__.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/autocompletion.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/autocompletion.cpython-38.pyc[m
+[1mindex 1c436fc..158882b 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/autocompletion.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/autocompletion.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/base_command.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/base_command.cpython-38.pyc[m
+[1mindex 56bbf60..347e529 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/base_command.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/base_command.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/cmdoptions.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/cmdoptions.cpython-38.pyc[m
+[1mindex 17ff7a3..37f390c 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/cmdoptions.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/cmdoptions.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/command_context.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/command_context.cpython-38.pyc[m
+[1mindex ac31e26..53849c7 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/command_context.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/command_context.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/index_command.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/index_command.cpython-38.pyc[m
+[1mindex 5ecc165..4deceb4 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/index_command.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/index_command.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/main.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/main.cpython-38.pyc[m
+[1mindex 9049e87..3d1f710 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/main.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/main.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/main_parser.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/main_parser.cpython-38.pyc[m
+[1mindex 6faaf3c..53d84e7 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/main_parser.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/main_parser.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/parser.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/parser.cpython-38.pyc[m
+[1mindex a77e2bf..4d9f1a0 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/parser.cpython-38.pyc and b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/parser.cpython-38.pyc differ
+[1mdiff --git a/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/progress_bars.cpython-38.pyc b/.venv/lib/python3.8/site-packages/pip/_internal/cli/__pycache__/progress_bars.cpython-38.pyc[m
+[1mindex efe65cc..2169101 100644[m
+Binary files a/.venv/lib/python3.8/site-packages/pip/_int
