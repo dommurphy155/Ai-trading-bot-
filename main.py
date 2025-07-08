@@ -1,3 +1,5 @@
+from failsafe import *  # this sets the global exception hook automatically
+
 import os
 import time
 import hmac
