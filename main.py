@@ -106,7 +106,6 @@ async def main():
     asyncio.create_task(market_scanner(trader))
     # Start Telegram command polling
     await bot.start_polling() 
-    Remove MT5 references, switch to FXOpen integration, fix imports
 
 if __name__ == "__main__":
     logging.info("FXOpen AI Bot running.")
