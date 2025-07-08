@@ -87,37 +87,29 @@ async def market_scanner(trader):
     while True:
         try:
             await trader.evaluate_and_execute()
-        except Exception as e:
-            logging.error(f"[Scanner Error] {e}")
-        await asyncio.sleep(1)
 
 async def main():
-    # Initialize AI, earnings, screenshot handlers
+    load_dotenv()
+    
+    # Initialize modules
     ai = AIAnalyzer()
     earnings = EarningsTracker()
     ss = Screenshot()
+    
+    # Set up Telegram bot and trader
+    bot = TelegramBot(None, earnings)
+    trader = Trader(ai, earnings, ss, bot)
+    bot.trader = trader
 
-    # Telegram bot setup (pass earnings for reporting)
-    tg_bot = TelegramBot(None, earnings)
-
-    # Trader with FXOpen integration (Trader class must be FXOpen ready)
-    trader = Trader(ai, earnings, ss, tg_bot)
-    tg_bot.trader = trader
-
-    # Start periodic FXOpen balance update every 60 seconds
-    asyncio.create_task(periodic_update(60))
-
-    # Start market scanning task
+    # Start background scanner
     asyncio.create_task(market_scanner(trader))
 
-    # Start Telegram bot polling
-    await tg_bot.start_polling()
+    # Send first update
+    await send_update()
+
+    # Start bot polling
+    await bot.start_polling()
 
 if __name__ == "__main__":
-    logging.info("Starting FXOpen AI Trading Bot")
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logging.info("Bot stopped by user")
-    except Exception as e:
-        logging.error(f"Fatal error: {e}")
+    logging.info("FXOpen AI Bot running.")
+    asyncio.run(main())
