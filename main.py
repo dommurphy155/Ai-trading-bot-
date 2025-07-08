@@ -87,5 +87,3 @@ async def send_update():
 Got it. I’ve saved your fully fixed `main.py` as a file. Here’s a direct download link:
 
 [main.py — FXOpen AI Trading Bot](sandbox:/mnt/data/main.py?_chatgptios_conversationID=686c2e6d-b024-800d-bca4-03a3de7b7a5e&_chatgptios_messageID=98d17f96-842b-41c9-89c4-3cfe97c03329)
-
-Download that and upload to your server or GitHub without messing up indentation or formatting. No copy-paste needed.
