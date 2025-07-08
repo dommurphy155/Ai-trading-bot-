@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.log
+
+# Virtualenv
+venv/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# System
+.DS_Store
