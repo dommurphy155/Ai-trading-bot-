@@ -1,33 +1,22 @@
-# deploy.sh
 #!/bin/bash
 
-echo "==== Deployment started at $(date -Iseconds) ===="
+set -e
 
-# Update package lists and install required packages
-sudo apt-get update
-sudo apt-get install -y python3.10 python3.10-venv python3.10-distutils build-essential libssl-dev libffi-dev python3-dev
+echo "🚀 Starting full bot deployment at $(date)"
 
-# Create and activate virtual environment
-python3.10 -m venv .venv
-source .venv/bin/activate
+# 1. Auto stash any local changes
+git stash push -m "auto-deploy stash" || echo "No local changes to stash"
 
-# Upgrade pip and install required Python packages
-pip install --upgrade pip setuptools wheel
+# 2. Pull latest from GitHub main branch
+git pull origin main || { echo "❌ Git pull failed"; exit 1; }
 
-# Install packages from requirements.txt except MetaTrader5
-pip install -r requirements.txt || true
+# 3. Fix indentation across all files (force 4 spaces)
+find . -type f -not -path '*/\.*' -exec sed -i 's/^\t/    /g' {} + && echo "✅ Indentation standardized"
 
-# PM2 installation check
-if ! command -v pm2 &> /dev/null; then
-    echo "PM2 not found, installing Node.js 16.x and PM2..."
-    curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
-    sudo apt-get install -y nodejs
-    sudo npm install -g pm2
-fi
+# 4. Install updated Python dependencies
+pip install -r requirements.txt || { echo "❌ Dependency install failed"; exit 1; }
 
-echo "Starting app with PM2..."
-pm2 stop ai-trader-bot || true
-pm2 delete ai-trader-bot || true
-pm2 start main.py --name ai-trader-bot --interpreter ~/.venv/bin/python --watch
+# 5. Restart bot process using PM2
+pm2 restart ai-trader-bot || pm2 start main.py --name ai-trader-bot
 
-echo "==== Deployment complete ===="
+echo "✅ Bot deployed and restarted successfully at $(date)"
