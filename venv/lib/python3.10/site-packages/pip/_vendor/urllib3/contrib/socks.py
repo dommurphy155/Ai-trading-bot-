@@ -48,11 +48,9 @@ except ImportError:
     from ..exceptions import DependencyWarning
 
     warnings.warn(
-        (
-            "SOCKS support in urllib3 requires the installation of optional "
-            "dependencies: specifically, PySocks.  For more information, see "
-            "https://urllib3.readthedocs.io/en/1.26.x/contrib.html#socks-proxies"
-        ),
+        ("SOCKS support in urllib3 requires the installation of optional "
+         "dependencies: specifically, PySocks.  For more information, see "
+         "https://urllib3.readthedocs.io/en/1.26.x/contrib.html#socks-proxies"),
         DependencyWarning,
     )
     raise
@@ -125,8 +123,8 @@ class SOCKSConnection(HTTPConnection):
                     )
                 else:
                     raise NewConnectionError(
-                        self, "Failed to establish a new connection: %s" % error
-                    )
+                        self, "Failed to establish a new connection: %s" %
+                        error)
             else:
                 raise NewConnectionError(
                     self, "Failed to establish a new connection: %s" % e
@@ -195,7 +193,9 @@ class SOCKSProxyManager(PoolManager):
             socks_version = socks.PROXY_TYPE_SOCKS4
             rdns = True
         else:
-            raise ValueError("Unable to determine SOCKS version from %s" % proxy_url)
+            raise ValueError(
+                "Unable to determine SOCKS version from %s" %
+                proxy_url)
 
         self.proxy_url = proxy_url
 
