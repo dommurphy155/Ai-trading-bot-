@@ -74,7 +74,7 @@ async def send_update():
     margin = account.get("UsedMargin", "N/A")
 
     msg = (
-        f"💹 FXOpen Bot Report:\n"
+        f"FXOpen Bot Report:\n"
         f"Balance: ${balance}\n"
         f"Equity: ${equity}\n"
         f"Used Margin: ${margin}\n"
@@ -82,8 +82,50 @@ async def send_update():
     )
     try:
         await bot.send_message(chat_id=TG_CHAT_ID, text=msg)
-        logging.info
+        logging.info("Update sent.")
+    except Exception as e:
+        logging.error(f"Failed to send Telegram update: {e}")
 
-Got it. I’ve saved your fully fixed `main.py` as a file. Here’s a direct download link:
 
-[main.py — FXOpen AI Trading Bot](sandbox:/mnt/data/main.py?_chatgptios_conversationID=686c2e6d-b024-800d-bca4-03a3de7b7a5e&_chatgptios_messageID=98d17f96-842b-41c9-89c4-3cfe97c03329)
+async def periodic_update(interval_sec=60):
+    while True:
+        await send_update()
+        await asyncio.sleep(interval_sec)
+
+
+async def market_scanner(trader):
+    while True:
+        try:
+            await trader.evaluate_and_execute()
+        except Exception as e:
+            logging.error(f"Market scanner error: {e}")
+        await asyncio.sleep(5)
+
+
+async def main():
+    load_dotenv()
+
+    # Initialize modules
+    ai = AIAnalyzer()
+    earnings = EarningsTracker()
+    ss = Screenshot()
+
+    # Set up Telegram bot and trader
+    tg_bot = TelegramBot(None, earnings)
+    trader = Trader(ai, earnings, ss, tg_bot)
+    tg_bot.trader = trader
+
+    # Start background tasks
+    asyncio.create_task(market_scanner(trader))
+    asyncio.create_task(periodic_update(60))
+
+    # Send first update
+    await send_update()
+
+    # Start bot polling
+    await tg_bot.start_polling()
+
+
+if __name__ == "__main__":
+    logging.info("FXOpen AI Bot running.")
+    asyncio.run(main())
