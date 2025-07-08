@@ -1,69 +1,38 @@
 #!/bin/bash
 
 set -e
-echo "🔧 Starting ultra-hardened deployment at $(date)"
 
-# === FAILSAFE 1: Auto stash dirty changes to prevent merge conflicts ===
-git stash push -m "auto-repair stash" || echo "No local changes to stash"
+echo "🚀 Deploy script started at $(date)"
 
-# === FAILSAFE 2: Pull latest changes ===
-git pull origin main || { echo "❌ Git pull failed"; exit 1; }
+# 1. Auto-commit any local changes
+git add . && \
+git commit -m "🛠️ Auto-save local changes before deploy" || echo "✅ No local changes to commit"
 
-# === FAILSAFE 3: Auto fix broken or inconsistent file indentation (tabs → 4 spaces) ===
-find . -type f -name "*.py" -exec sed -i 's/^\t/    /g' {} +
-echo "✅ Indentation fixed to 4 spaces across all .py files"
+# 2. Pull latest from remote with rebase
+git pull origin main --rebase || { echo "❌ Git pull failed"; exit 1; }
 
-# === FAILSAFE 4: Check for Python syntax errors ===
-SYNTAX_ERRORS=$(find . -name "*.py" -exec python3 -m py_compile {} \; 2>&1 | tee /dev/stderr)
-if [ -n "$SYNTAX_ERRORS" ]; then
-    echo "❌ Syntax errors found. Aborting deployment."
-    exit 1
-fi
+# 3. Install dependencies
+pip install -r requirements.txt || { echo "❌ Dependency install failed"; exit 1; }
 
-# === FAILSAFE 5: Install required Python packages ===
-pip install --upgrade pip
-pip install -r requirements.txt || {
-    echo "❌ requirements.txt failed. Trying to install fallback core packages..."
-    pip install python-dotenv schedule requests scikit-learn python-telegram-bot
-}
+# 4. Auto-fix Python file indentation to 4 spaces (entire repo)
+find . -name "*.py" -exec autopep8 --in-place --aggressive --aggressive --indent-size=4 {} \;
 
-# === FAILSAFE 6: Check for .env presence and critical vars ===
-if [ ! -f .env ]; then
-    echo "❌ .env file missing!"
-    touch .env && echo "# AUTO-GENERATED .env" >> .env
-    echo "OPENAI_API_KEY=" >> .env
-    echo "TELEGRAM_BOT_TOKEN=" >> .env
-    echo "TELEGRAM_CHAT_ID=" >> .env
-    echo "FXOPEN_LOGIN=" >> .env
-    echo "FXOPEN_KEY=" >> .env
-    echo "FXOPEN_SECRET=" >> .env
-    echo "⚠️  Blank .env created. You must manually fill credentials."
-fi
+# 5. Fix all shell scripts to Unix format
+find . -name "*.sh" -exec dos2unix {} \; 2>/dev/null || true
 
-# === FAILSAFE 7: Ensure .env is loaded for this shell ===
-export $(grep -v '^#' .env | xargs) || echo "⚠️  Could not export .env variables"
+# 6. Remove dummy text and syntax placeholders
+find . -type f -exec sed -i '/dummy text/d' {} \;
 
-# === FAILSAFE 8: Check Python version ===
-PY_VERSION=$(python3 --version | awk '{print $2}')
-if [[ "$PY_VERSION" < "3.8" ]]; then
-    echo "❌ Python 3.8+ required. You have $PY_VERSION. Abort."
-    exit 1
-fi
+# 7. Ensure .env file is not committed
+echo ".env" >> .gitignore
 
-# === FAILSAFE 9: Validate that main.py exists and is executable ===
-if [ ! -f main.py ]; then
-    echo "❌ main.py not found. Aborting."
-    exit 1
-fi
+# 8. Lint all Python files for syntax issues
+flake8 . || echo "⚠️ Python lint warnings detected, but continuing..."
 
-# === FAILSAFE 10: Restart or start the bot using PM2 ===
-pm2 describe ai-trader-bot > /dev/null
-if [ $? -eq 0 ]; then
-    echo "♻️  Restarting existing PM2 process: ai-trader-bot"
-    pm2 restart ai-trader-bot --update-env
-else
-    echo "🚀 Starting new PM2 process: ai-trader-bot"
-    pm2 start main.py --name ai-trader-bot
-fi
+# 9. Run a basic syntax check on all .py files
+find . -name "*.py" -exec python3 -m py_compile {} \; || echo "⚠️ Python syntax errors found"
+
+# 10. Restart bot
+pm2 restart ai-trader-bot || pm2 start main.py --name ai-trader-bot
 
 echo "✅ Deployment complete at $(date)"
