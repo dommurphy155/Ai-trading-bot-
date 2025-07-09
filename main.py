@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 AI Trading Bot - Main Entry Point
 Integrates OpenAI analysis, FXOpen trading, and Telegram monitoring
