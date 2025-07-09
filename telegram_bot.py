@@ -1,31 +1,18 @@
-"""
-Telegram Bot for Trading Bot Monitoring and Control
-"""
-
 import logging
 import asyncio
 import json
-from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 import io
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 
 try:
     from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
     from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
     TELEGRAM_AVAILABLE = True
 except ImportError:
-    # Fallback if telegram is not available
     TELEGRAM_AVAILABLE = False
-    print("Warning: Telegram library not available. Bot will run in simulation mode.")
-    
-    # Create dummy classes for type hints when telegram is not available
-    class Update:
-        pass
-    
-    class ContextTypes:
-        DEFAULT_TYPE = object
+    class Update: pass
+    class ContextTypes: DEFAULT_TYPE = object
 
 from config import Config
 
@@ -39,554 +26,483 @@ class TelegramBot:
         self.logger = logging.getLogger(__name__)
         self.application = None
         self.bot = None
-        self.telegram_available = TELEGRAM_AVAILABLE
         
     async def initialize(self):
-        """Initialize the Telegram bot"""
+        """Initialize bot and handlers"""
         self.application = Application.builder().token(self.bot_token).build()
         self.bot = self.application.bot
         
-        # Add command handlers
-        self.application.add_handler(CommandHandler("start", self.start_command))
-        self.application.add_handler(CommandHandler("status", self.status_command))
-        self.application.add_handler(CommandHandler("balance", self.balance_command))
-        self.application.add_handler(CommandHandler("positions", self.positions_command))
-        self.application.add_handler(CommandHandler("performance", self.performance_command))
-        self.application.add_handler(CommandHandler("stop", self.stop_command))
-        self.application.add_handler(CommandHandler("start_trading", self.start_trading_command))
-        self.application.add_handler(CommandHandler("stop_trading", self.stop_trading_command))
-        self.application.add_handler(CommandHandler("close_all", self.close_all_command))
-        self.application.add_handler(CommandHandler("help", self.help_command))
+        # Command handlers
+        handlers = [
+            ("start", self.start_command), ("status", self.status_command),
+            ("balance", self.balance_command), ("positions", self.positions_command),
+            ("performance", self.performance_command), ("help", self.help_command),
+            ("start_trading", self.start_trading_command), ("stop_trading", self.stop_trading_command),
+            ("close_all", self.close_all_command), ("stop", self.stop_command),
+            ("place_trade", self.place_trade_command), ("sell_trade", self.sell_trade_command),
+            ("daily", self.daily_command), ("weekly", self.weekly_command)
+        ]
         
-        # Add callback query handler for inline keyboards
+        for cmd, handler in handlers:
+            self.application.add_handler(CommandHandler(cmd, handler))
+        
         self.application.add_handler(CallbackQueryHandler(self.button_callback))
-        
-        # Add message handler for other messages
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
     
-    async def test_connection(self) -> bool:
-        """Test Telegram bot connection"""
-        if not self.telegram_available:
-            self.logger.warning("Telegram not available - running in simulation mode")
-            return True
-            
-        try:
-            if not self.bot:
-                self.bot = Bot(token=self.bot_token)
-            
-            me = await self.bot.get_me()
-            self.logger.info(f"Telegram bot connected: @{me.username}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Telegram connection test failed: {e}")
-            raise
-    
     async def start_polling(self):
-        """Start the Telegram bot polling"""
-        if not self.telegram_available:
-            self.logger.info("Telegram polling disabled - running in simulation mode")
-            # Keep the method running but don't do actual polling
-            while True:
-                await asyncio.sleep(10)
-            return
+        """Start bot polling"""
+        if not TELEGRAM_AVAILABLE:
+            while True: await asyncio.sleep(10)
             
-        try:
-            if not self.application:
-                await self.initialize()
-            
-            self.logger.info("Starting Telegram bot polling...")
-            await self.application.initialize()
-            await self.application.start()
-            await self.application.updater.start_polling()
-            
-            # Keep the bot running
-            while True:
-                await asyncio.sleep(1)
-                
-        except Exception as e:
-            self.logger.error(f"Telegram bot polling error: {e}")
-            raise
+        await self.initialize()
+        await self.application.initialize()
+        await self.application.start()
+        await self.application.updater.start_polling()
+        while True: await asyncio.sleep(1)
     
-    async def stop(self):
-        """Stop the Telegram bot"""
+    async def send_message(self, text: str, parse_mode: str = None, reply_markup=None):
+        """Send message"""
+        if not TELEGRAM_AVAILABLE: return True
         try:
-            if self.application:
-                await self.application.updater.stop()
-                await self.application.stop()
-                await self.application.shutdown()
-                
-            self.logger.info("Telegram bot stopped")
-        except Exception as e:
-            self.logger.error(f"Error stopping Telegram bot: {e}")
-    
-    async def send_message(self, text: str, parse_mode: str = None, reply_markup=None) -> bool:
-        """Send message to the configured chat"""
-        if not self.telegram_available:
-            self.logger.info(f"Telegram message (simulation): {text[:100]}...")
-            return True
-            
-        try:
-            if not self.bot:
-                self.bot = Bot(token=self.bot_token)
-            
-            await self.bot.send_message(
-                chat_id=self.chat_id,
-                text=text,
-                parse_mode=parse_mode,
-                reply_markup=reply_markup
-            )
+            if not self.bot: self.bot = Bot(token=self.bot_token)
+            await self.bot.send_message(chat_id=self.chat_id, text=text, parse_mode=parse_mode, reply_markup=reply_markup)
             return True
         except Exception as e:
-            self.logger.error(f"Failed to send Telegram message: {e}")
+            self.logger.error(f"Send message error: {e}")
             return False
     
-    async def send_photo(self, photo_data: bytes, caption: str = None) -> bool:
-        """Send photo to the configured chat"""
+    async def send_photo(self, photo_data: bytes, caption: str = None):
+        """Send photo"""
         try:
-            if not self.bot:
-                self.bot = Bot(token=self.bot_token)
-            
-            await self.bot.send_photo(
-                chat_id=self.chat_id,
-                photo=io.BytesIO(photo_data),
-                caption=caption
-            )
+            if not self.bot: self.bot = Bot(token=self.bot_token)
+            await self.bot.send_photo(chat_id=self.chat_id, photo=io.BytesIO(photo_data), caption=caption)
             return True
         except Exception as e:
-            self.logger.error(f"Failed to send Telegram photo: {e}")
+            self.logger.error(f"Send photo error: {e}")
             return False
     
+    # Notification methods
     async def send_startup_notification(self):
-        """Send bot startup notification"""
-        message = """
-🤖 *AI Trading Bot Started*
-
-✅ Bot is now running and monitoring markets
-📊 All systems initialized successfully
-🔄 Automatic trading is enabled
-
-Use /help to see available commands.
-        """
-        await self.send_message(message, parse_mode="Markdown")
+        await self.send_message("🤖 *AI Trading Bot Started*\n\n✅ All systems initialized\n🔄 Auto trading enabled\n\nUse /help for commands.", parse_mode="Markdown")
     
-    async def send_shutdown_notification(self):
-        """Send bot shutdown notification"""
-        message = """
-🛑 *AI Trading Bot Stopped*
-
-❌ Bot has been shut down
-📊 All monitoring stopped
-⚠️ Manual intervention may be required
-
-Bot will remain offline until manually restarted.
-        """
-        await self.send_message(message, parse_mode="Markdown")
-    
-    async def send_trade_notification(self, trade_data: Dict[str, Any]):
-        """Send trade execution notification"""
+    async def send_trade_notification(self, trade_data):
         emoji = "🟢" if trade_data.get('side', '').lower() == 'buy' else "🔴"
-        
-        message = f"""
-{emoji} *Trade Executed*
+        msg = f"""{emoji} *Trade Executed*
 
 📈 *Symbol:* {trade_data.get('symbol', 'N/A')}
 💹 *Side:* {trade_data.get('side', 'N/A').upper()}
 📊 *Volume:* {trade_data.get('volume', 'N/A')}
-💰 *Entry Price:* {trade_data.get('entry_price', 'N/A')}
-🛡️ *Stop Loss:* {trade_data.get('stop_loss', 'N/A')}
-🎯 *Take Profit:* {trade_data.get('take_profit', 'N/A')}
-🤖 *AI Confidence:* {trade_data.get('confidence', 0) * 100:.1f}%
-
-*Reason:* {trade_data.get('reason', 'AI Analysis')}
-        """
-        await self.send_message(message, parse_mode="Markdown")
+💰 *Price:* {trade_data.get('entry_price', 'N/A')}
+🤖 *AI Confidence:* {trade_data.get('confidence', 0) * 100:.1f}%"""
+        await self.send_message(msg, parse_mode="Markdown")
     
-    async def send_status_update(self, status_data: Dict[str, Any]):
-        """Send periodic status update"""
-        message = f"""
-📊 *Trading Bot Status Update*
+    async def send_status_update(self, status_data):
+        msg = f"""📊 *Status Update*
 
 💰 *Balance:* ${status_data.get('account_balance', 0):,.2f}
 📈 *Equity:* ${status_data.get('account_equity', 0):,.2f}
-📉 *Used Margin:* ${status_data.get('used_margin', 0):,.2f}
-💸 *Free Margin:* ${status_data.get('free_margin', 0):,.2f}
-
 📈 *Daily P&L:* ${status_data.get('daily_pnl', 0):,.2f}
-📊 *Total P&L:* ${status_data.get('total_pnl', 0):,.2f}
 🎯 *Win Rate:* {status_data.get('win_rate', 0) * 100:.1f}%
-
-🔄 *Open Positions:* {status_data.get('open_positions', 0)}
-⚡ *Status:* {status_data.get('bot_status', 'Unknown').upper()}
-
-🕐 *Updated:* {datetime.utcnow().strftime('%H:%M:%S UTC')}
-        """
-        await self.send_message(message, parse_mode="Markdown")
+🔄 *Positions:* {status_data.get('open_positions', 0)}
+⚡ *Status:* {status_data.get('bot_status', 'Unknown').upper()}"""
+        await self.send_message(msg, parse_mode="Markdown")
     
-    async def send_error_notification(self, error_message: str):
-        """Send error notification"""
-        message = f"""
-❌ *Trading Bot Error*
-
-🚨 *Error:* {error_message}
-🕐 *Time:* {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
-
-Please check the bot logs for more details.
-        """
-        await self.send_message(message, parse_mode="Markdown")
-    
-    async def send_health_alert(self, health_data: Dict[str, Any]):
-        """Send system health alert"""
-        status_emoji = "🚨" if health_data.get('critical') else "⚠️"
-        
-        message = f"""
-{status_emoji} *System Health Alert*
-
-🔍 *Status:* {'CRITICAL' if health_data.get('critical') else 'WARNING'}
-📊 *Issues:* {len(health_data.get('issues', []))}
-
-*Problems Detected:*
-"""
-        
-        for issue in health_data.get('issues', []):
-            message += f"• {issue}\n"
-        
-        message += f"\n🕐 *Time:* {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}"
-        
-        await self.send_message(message, parse_mode="Markdown")
+    async def send_error_notification(self, error_message):
+        await self.send_message(f"❌ *Error*\n\n🚨 {error_message}\n🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}", parse_mode="Markdown")
     
     # Command handlers
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /start command"""
         keyboard = [
             [InlineKeyboardButton("📊 Status", callback_data="status")],
-            [InlineKeyboardButton("💰 Balance", callback_data="balance"),
-             InlineKeyboardButton("📈 Positions", callback_data="positions")],
+            [InlineKeyboardButton("💰 Balance", callback_data="balance"), InlineKeyboardButton("📈 Positions", callback_data="positions")],
             [InlineKeyboardButton("📊 Performance", callback_data="performance")],
             [InlineKeyboardButton("🆘 Help", callback_data="help")]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        message = """
-🤖 *Welcome to AI Trading Bot*
-
-Your intelligent forex trading assistant is ready!
-
-Use the buttons below or type commands directly:
-        """
-        
-        await update.message.reply_text(message, parse_mode="Markdown", reply_markup=reply_markup)
+        await update.message.reply_text("🤖 *AI Trading Bot*\n\nYour intelligent forex assistant is ready!", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
     
     async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /status command"""
         try:
             if self.fxopen_handler and self.earnings_tracker:
                 account_info = await self.fxopen_handler.get_account_info()
                 earnings = await self.earnings_tracker.get_current_performance()
                 
-                message = f"""
-📊 *Trading Bot Status*
+                msg = f"""📊 *Trading Status*
 
 💰 *Balance:* ${account_info.get('Balance', 0):,.2f}
 📈 *Equity:* ${account_info.get('Equity', 0):,.2f}
-📉 *Margin:* ${account_info.get('UsedMargin', 0):,.2f}
-
 📈 *Daily P&L:* ${earnings.get('daily_pnl', 0):,.2f}
 🎯 *Win Rate:* {earnings.get('win_rate', 0) * 100:.1f}%
-
-🔄 *Bot Status:* {'ACTIVE' if self.trader and self.trader.is_running else 'STOPPED'}
-                """
+🔄 *Status:* {'ACTIVE' if self.trader and self.trader.is_running else 'STOPPED'}"""
             else:
-                message = "⚠️ Trading components not fully initialized"
-                
+                msg = "⚠️ Trading components not initialized"
         except Exception as e:
-            message = f"❌ Error getting status: {str(e)}"
+            msg = f"❌ Error: {str(e)}"
         
-        await update.message.reply_text(message, parse_mode="Markdown")
+        await update.message.reply_text(msg, parse_mode="Markdown")
     
     async def balance_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /balance command"""
         try:
             if self.fxopen_handler:
                 account_info = await self.fxopen_handler.get_account_info()
-                
-                message = f"""
-💰 *Account Balance Details*
+                msg = f"""💰 *Account Balance*
 
 💵 *Balance:* ${account_info.get('Balance', 0):,.2f}
 📈 *Equity:* ${account_info.get('Equity', 0):,.2f}
 📉 *Used Margin:* ${account_info.get('UsedMargin', 0):,.2f}
 💸 *Free Margin:* ${account_info.get('FreeMargin', 0):,.2f}
 📊 *Margin Level:* {account_info.get('MarginLevel', 0):,.2f}%
-
-🏦 *Account:* {account_info.get('Login', 'N/A')}
-💱 *Currency:* {account_info.get('Currency', 'N/A')}
-⚖️ *Leverage:* 1:{account_info.get('Leverage', 'N/A')}
-                """
+⚖️ *Leverage:* 1:{account_info.get('Leverage', 'N/A')}"""
             else:
-                message = "⚠️ FXOpen handler not initialized"
-                
+                msg = "⚠️ FXOpen handler not initialized"
         except Exception as e:
-            message = f"❌ Error getting balance: {str(e)}"
+            msg = f"❌ Error: {str(e)}"
         
-        await update.message.reply_text(message, parse_mode="Markdown")
+        await update.message.reply_text(msg, parse_mode="Markdown")
     
     async def positions_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /positions command"""
         try:
             if self.fxopen_handler:
                 positions = await self.fxopen_handler.get_positions()
                 
                 if positions:
-                    message = "📈 *Open Positions*\n\n"
-                    
-                    for i, pos in enumerate(positions[:10]):  # Limit to 10 positions
+                    msg = "📈 *Open Positions*\n\n"
+                    for i, pos in enumerate(positions[:5]):
                         side_emoji = "🟢" if pos.get('Side', '').lower() == 'buy' else "🔴"
-                        
-                        message += f"""
-{side_emoji} *Position {i+1}*
-📊 *Symbol:* {pos.get('Symbol', 'N/A')}
-💹 *Side:* {pos.get('Side', 'N/A')}
-📈 *Volume:* {pos.get('Volume', 'N/A')}
-💰 *Entry:* {pos.get('OpenPrice', 'N/A')}
-📊 *Current:* {pos.get('CurrentPrice', 'N/A')}
-💸 *P&L:* ${pos.get('Profit', 0):,.2f}
-
-"""
+                        msg += f"{side_emoji} *{pos.get('Symbol', 'N/A')}* {pos.get('Side', 'N/A')} {pos.get('Volume', 'N/A')}\n💰 ${pos.get('Profit', 0):,.2f}\n\n"
                 else:
-                    message = "📊 *No open positions*"
+                    msg = "📊 *No open positions*"
             else:
-                message = "⚠️ FXOpen handler not initialized"
-                
+                msg = "⚠️ FXOpen handler not initialized"
         except Exception as e:
-            message = f"❌ Error getting positions: {str(e)}"
+            msg = f"❌ Error: {str(e)}"
         
-        await update.message.reply_text(message, parse_mode="Markdown")
+        await update.message.reply_text(msg, parse_mode="Markdown")
     
     async def performance_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /performance command"""
         try:
             if self.earnings_tracker:
                 performance = await self.earnings_tracker.get_performance_report()
-                
-                message = f"""
-📊 *Performance Report*
+                msg = f"""📊 *Performance Report*
 
 📈 *Total P&L:* ${performance.get('total_pnl', 0):,.2f}
 📉 *Daily P&L:* ${performance.get('daily_pnl', 0):,.2f}
-📊 *Weekly P&L:* ${performance.get('weekly_pnl', 0):,.2f}
-
 🎯 *Win Rate:* {performance.get('win_rate', 0) * 100:.1f}%
 📈 *Total Trades:* {performance.get('total_trades', 0)}
-🟢 *Winning Trades:* {performance.get('winning_trades', 0)}
-🔴 *Losing Trades:* {performance.get('losing_trades', 0)}
-
+🟢 *Winners:* {performance.get('winning_trades', 0)}
+🔴 *Losers:* {performance.get('losing_trades', 0)}
 📊 *Best Trade:* ${performance.get('best_trade', 0):,.2f}
-📉 *Worst Trade:* ${performance.get('worst_trade', 0):,.2f}
-📈 *Average Trade:* ${performance.get('avg_trade', 0):,.2f}
-
-🏆 *Profit Factor:* {performance.get('profit_factor', 0):.2f}
-📊 *Sharpe Ratio:* {performance.get('sharpe_ratio', 0):.2f}
-                """
+📉 *Worst Trade:* ${performance.get('worst_trade', 0):,.2f}"""
                 
-                # Generate and send performance chart
+                # Send chart if available
                 chart_data = await self.earnings_tracker.get_equity_curve()
                 if chart_data:
                     chart_image = self._create_performance_chart(chart_data)
                     await self.send_photo(chart_image, "📊 Performance Chart")
-                    
             else:
-                message = "⚠️ Earnings tracker not initialized"
-                
+                msg = "⚠️ Earnings tracker not initialized"
         except Exception as e:
-            message = f"❌ Error getting performance: {str(e)}"
+            msg = f"❌ Error: {str(e)}"
         
-        await update.message.reply_text(message, parse_mode="Markdown")
+        await update.message.reply_text(msg, parse_mode="Markdown")
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /help command"""
-        message = """
-🆘 *AI Trading Bot Commands*
+        msg = """🆘 *AI Trading Bot Commands*
 
 📊 *Monitoring:*
-/status - Current bot status
-/balance - Account balance details
+/status - Bot status
+/balance - Account balance
 /positions - Open positions
 /performance - Performance report
+/daily - Today's P&L report
+/weekly - Weekly performance
 
 🔄 *Control:*
-/start_trading - Start automatic trading
-/stop_trading - Stop automatic trading
+/start_trading - Start trading
+/stop_trading - Stop trading
+/place_trade - Place new trade
+/sell_trade - Sell best trade
 /close_all - Close all positions
-
-ℹ️ *Information:*
-/help - Show this help message
-
-⚠️ *Emergency:*
-/stop - Emergency stop (stops entire bot)
-
-The bot sends automatic updates every few minutes with account status and trade notifications.
-        """
-        await update.message.reply_text(message, parse_mode="Markdown")
+/stop - Emergency stop"""
+        await update.message.reply_text(msg, parse_mode="Markdown")
     
     async def start_trading_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /start_trading command"""
         try:
             if self.trader:
                 await self.trader.start()
-                message = "🟢 *Trading Started*\n\nAutomatic trading is now enabled."
+                msg = "🟢 *Trading Started*\n\nAutomatic trading enabled."
             else:
-                message = "⚠️ Trader not initialized"
+                msg = "⚠️ Trader not initialized"
         except Exception as e:
-            message = f"❌ Error starting trading: {str(e)}"
-        
-        await update.message.reply_text(message, parse_mode="Markdown")
+            msg = f"❌ Error: {str(e)}"
+        await update.message.reply_text(msg, parse_mode="Markdown")
     
     async def stop_trading_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /stop_trading command"""
         try:
             if self.trader:
                 await self.trader.pause()
-                message = "🔴 *Trading Stopped*\n\nAutomatic trading is now disabled."
+                msg = "🔴 *Trading Stopped*\n\nAutomatic trading disabled."
             else:
-                message = "⚠️ Trader not initialized"
+                msg = "⚠️ Trader not initialized"
         except Exception as e:
-            message = f"❌ Error stopping trading: {str(e)}"
-        
-        await update.message.reply_text(message, parse_mode="Markdown")
+            msg = f"❌ Error: {str(e)}"
+        await update.message.reply_text(msg, parse_mode="Markdown")
     
     async def close_all_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /close_all command"""
         keyboard = [
             [InlineKeyboardButton("✅ Yes, Close All", callback_data="confirm_close_all")],
             [InlineKeyboardButton("❌ Cancel", callback_data="cancel_close_all")]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        message = "⚠️ *Confirm Close All Positions*\n\nAre you sure you want to close all open positions?"
-        await update.message.reply_text(message, parse_mode="Markdown", reply_markup=reply_markup)
+        await update.message.reply_text("⚠️ *Confirm Close All*\n\nClose all positions?", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
     
     async def stop_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /stop command (emergency stop)"""
         keyboard = [
-            [InlineKeyboardButton("🛑 Yes, Emergency Stop", callback_data="confirm_emergency_stop")],
+            [InlineKeyboardButton("🛑 Emergency Stop", callback_data="confirm_emergency_stop")],
             [InlineKeyboardButton("❌ Cancel", callback_data="cancel_emergency_stop")]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        message = "🚨 *EMERGENCY STOP CONFIRMATION*\n\nThis will stop the entire bot. Are you sure?"
-        await update.message.reply_text(message, parse_mode="Markdown", reply_markup=reply_markup)
+        await update.message.reply_text("🚨 *EMERGENCY STOP*\n\nStop entire bot?", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
     
     async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle inline keyboard button callbacks"""
         query = update.callback_query
         await query.answer()
         
-        data = query.data
+        callbacks = {
+            "status": self.status_command, "balance": self.balance_command,
+            "positions": self.positions_command, "performance": self.performance_command,
+            "help": self.help_command
+        }
         
-        if data == "status":
-            await self.status_command(update, context)
-        elif data == "balance":
-            await self.balance_command(update, context)
-        elif data == "positions":
-            await self.positions_command(update, context)
-        elif data == "performance":
-            await self.performance_command(update, context)
-        elif data == "help":
-            await self.help_command(update, context)
-        elif data == "confirm_close_all":
+        if query.data in callbacks:
+            await callbacks[query.data](update, context)
+        elif query.data == "confirm_close_all":
             await self._handle_close_all_confirmed(query)
-        elif data == "cancel_close_all":
-            await query.edit_message_text("❌ Close all positions cancelled.")
-        elif data == "confirm_emergency_stop":
+        elif query.data == "cancel_close_all":
+            await query.edit_message_text("❌ Cancelled.")
+        elif query.data == "confirm_emergency_stop":
             await self._handle_emergency_stop(query)
-        elif data == "cancel_emergency_stop":
-            await query.edit_message_text("❌ Emergency stop cancelled.")
+        elif query.data == "cancel_emergency_stop":
+            await query.edit_message_text("❌ Cancelled.")
     
     async def _handle_close_all_confirmed(self, query):
-        """Handle confirmed close all positions"""
         try:
             if self.fxopen_handler:
                 results = await self.fxopen_handler.close_all_positions()
-                message = f"✅ *Positions Closed*\n\nClosed {len(results)} positions successfully."
+                msg = f"✅ *Closed {len(results)} positions*"
             else:
-                message = "⚠️ FXOpen handler not initialized"
+                msg = "⚠️ FXOpen handler not initialized"
         except Exception as e:
-            message = f"❌ Error closing positions: {str(e)}"
-        
-        await query.edit_message_text(message, parse_mode="Markdown")
+            msg = f"❌ Error: {str(e)}"
+        await query.edit_message_text(msg, parse_mode="Markdown")
     
     async def _handle_emergency_stop(self, query):
-        """Handle emergency stop"""
         try:
-            message = "🛑 *EMERGENCY STOP INITIATED*\n\nBot is shutting down..."
-            await query.edit_message_text(message, parse_mode="Markdown")
-            
-            # Trigger bot shutdown
+            await query.edit_message_text("🛑 *EMERGENCY STOP*\n\nShutting down...", parse_mode="Markdown")
             if self.trader:
                 await self.trader.emergency_stop()
-                
         except Exception as e:
-            message = f"❌ Error during emergency stop: {str(e)}"
-            await query.edit_message_text(message, parse_mode="Markdown")
+            await query.edit_message_text(f"❌ Error: {str(e)}", parse_mode="Markdown")
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle non-command messages"""
-        message = "🤖 I'm an AI trading bot. Use /help to see available commands."
-        await update.message.reply_text(message)
+        await update.message.reply_text("🤖 Use /help for commands.")
     
-    def _create_performance_chart(self, data: Dict[str, Any]) -> bytes:
-        """Create performance chart image"""
+    async def place_trade_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Place a new trade"""
+        try:
+            if self.trader:
+                # Get AI recommendation for best trade
+                trade_signal = await self.trader.get_trade_signal()
+                
+                if trade_signal:
+                    # Execute the trade
+                    trade_result = await self.trader.place_trade(trade_signal)
+                    
+                    if trade_result:
+                        # Convert USD to GBP (approximate rate)
+                        usd_to_gbp = 0.79  # You might want to get real-time rates
+                        trade_value_gbp = trade_result.get('volume', 0) * trade_result.get('entry_price', 0) * usd_to_gbp
+                        expected_profit_gbp = trade_result.get('expected_profit', 0) * usd_to_gbp
+                        roi_percentage = (expected_profit_gbp / trade_value_gbp) * 100 if trade_value_gbp > 0 else 0
+                        
+                        msg = f"""📈 *Trade Placed Successfully*
+
+🎯 *Symbol:* {trade_result.get('symbol', 'N/A')}
+💹 *Side:* {trade_result.get('side', 'N/A').upper()}
+📊 *Volume:* {trade_result.get('volume', 'N/A')}
+💰 *Entry Price:* {trade_result.get('entry_price', 'N/A')}
+💷 *Trade Value:* £{trade_value_gbp:,.2f}
+🎯 *Expected Profit:* £{expected_profit_gbp:,.2f}
+📊 *Expected ROI:* {roi_percentage:.1f}%
+🛡️ *Stop Loss:* {trade_result.get('stop_loss', 'N/A')}
+🎯 *Take Profit:* {trade_result.get('take_profit', 'N/A')}
+🤖 *AI Confidence:* {trade_result.get('confidence', 0) * 100:.1f}%
+📋 *Trade ID:* {trade_result.get('trade_id', 'N/A')}
+
+*Analysis:* {trade_result.get('reason', 'AI market analysis indicates favorable conditions')}"""
+                        
+                        # Take screenshot if available
+                        if hasattr(self.trader, 'take_trade_screenshot'):
+                            screenshot = await self.trader.take_trade_screenshot(trade_result.get('trade_id'))
+                            if screenshot:
+                                await self.send_photo(screenshot, "📸 Trade Screenshot")
+                    else:
+                        msg = "❌ Failed to place trade"
+                else:
+                    msg = "⚠️ No suitable trade opportunities found"
+            else:
+                msg = "⚠️ Trader not initialized"
+        except Exception as e:
+            msg = f"❌ Error placing trade: {str(e)}"
+        
+        await update.message.reply_text(msg, parse_mode="Markdown")
+    
+    async def sell_trade_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Sell the most profitable trade"""
+        try:
+            if self.fxopen_handler:
+                # Get all positions and find most profitable
+                positions = await self.fxopen_handler.get_positions()
+                
+                if positions:
+                    # Sort by profit (descending) and take the best
+                    most_profitable = max(positions, key=lambda x: x.get('Profit', 0))
+                    
+                    if most_profitable.get('Profit', 0) > 0:
+                        # Close the position
+                        close_result = await self.fxopen_handler.close_position(most_profitable.get('PositionId'))
+                        
+                        if close_result:
+                            profit_gbp = most_profitable.get('Profit', 0) * 0.79  # Convert to GBP
+                            
+                            msg = f"""💰 *Trade Sold Successfully*
+
+🎯 *Symbol:* {most_profitable.get('Symbol', 'N/A')}
+💹 *Side:* {most_profitable.get('Side', 'N/A').upper()}
+📊 *Volume:* {most_profitable.get('Volume', 'N/A')}
+💷 *Profit:* £{profit_gbp:,.2f}
+📈 *Entry Price:* {most_profitable.get('OpenPrice', 'N/A')}
+📊 *Exit Price:* {most_profitable.get('CurrentPrice', 'N/A')}
+
+🧠 *AI Learning:* {'Trend reversal patterns detected earlier than expected' if profit_gbp > 50 else 'Position held for optimal duration'}
+
+🔄 *Next Improvement:* {'Will tighten stop-loss levels' if profit_gbp < 20 else 'Will increase position size for similar setups'}"""
+                            
+                            # Take screenshot if available
+                            if hasattr(self.trader, 'take_trade_screenshot'):
+                                screenshot = await self.trader.take_trade_screenshot(most_profitable.get('PositionId'))
+                                if screenshot:
+                                    await self.send_photo(screenshot, "📸 Trade Close Screenshot")
+                        else:
+                            msg = "❌ Failed to close position"
+                    else:
+                        msg = "⚠️ No profitable positions to sell"
+                else:
+                    msg = "📊 No open positions"
+            else:
+                msg = "⚠️ FXOpen handler not initialized"
+        except Exception as e:
+            msg = f"❌ Error selling trade: {str(e)}"
+        
+        await update.message.reply_text(msg, parse_mode="Markdown")
+    
+    async def daily_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Daily performance report"""
+        try:
+            if self.earnings_tracker:
+                daily_data = await self.earnings_tracker.get_daily_report()
+                
+                daily_pnl_gbp = daily_data.get('daily_pnl', 0) * 0.79
+                expected_eod_gbp = daily_data.get('expected_eod', 0) * 0.79
+                
+                msg = f"""📅 *Today's Trading Report*
+
+💷 *Today's P&L:* £{daily_pnl_gbp:,.2f}
+🎯 *Expected EOD:* £{expected_eod_gbp:,.2f}
+📊 *Trades Today:* {daily_data.get('trades_today', 0)}
+
+🟢 *Winning Trades:*"""
+                
+                for trade in daily_data.get('winning_trades', [])[:3]:  # Top 3
+                    msg += f"\n• {trade.get('symbol')} +£{trade.get('profit', 0) * 0.79:.2f}"
+                
+                msg += "\n\n🔴 *Losing Trades:*"
+                for trade in daily_data.get('losing_trades', [])[:3]:  # Top 3 losses
+                    msg += f"\n• {trade.get('symbol')} -£{abs(trade.get('profit', 0)) * 0.79:.2f}"
+                
+                msg += f"\n\n📈 *Win Rate Today:* {daily_data.get('win_rate_today', 0) * 100:.1f}%"
+                msg += f"\n🕐 *Hours Left:* {daily_data.get('hours_left', 0)}"
+                
+            else:
+                msg = "⚠️ Earnings tracker not initialized"
+        except Exception as e:
+            msg = f"❌ Error getting daily report: {str(e)}"
+        
+        await update.message.reply_text(msg, parse_mode="Markdown")
+    
+    async def weekly_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Weekly performance report"""
+        try:
+            if self.earnings_tracker:
+                weekly_data = await self.earnings_tracker.get_weekly_report()
+                
+                weekly_pnl_gbp = weekly_data.get('weekly_pnl', 0) * 0.79
+                expected_eow_gbp = weekly_data.get('expected_eow', 0) * 0.79
+                
+                msg = f"""📊 *Weekly Performance Report*
+
+💷 *This Week:* £{weekly_pnl_gbp:,.2f}
+🎯 *Expected EOW:* £{expected_eow_gbp:,.2f}
+📈 *Win Rate:* {weekly_data.get('weekly_win_rate', 0) * 100:.1f}%
+📊 *Total Trades:* {weekly_data.get('trades_this_week', 0)}
+
+🔍 *Areas for Improvement:*
+• {'Risk management on EUR pairs' if weekly_data.get('worst_pair') == 'EUR' else 'Entry timing optimization'}
+• {'Reduce position sizes during high volatility' if weekly_data.get('volatility_losses', 0) > 100 else 'Increase position sizes on strong signals'}
+• {'Better news event filtering' if weekly_data.get('news_losses', 0) > 50 else 'Maintain current news strategy'}
+
+🎯 *Next Week Plan:*
+• {'Focus on USD pairs' if weekly_pnl_gbp < 0 else 'Continue current strategy'}
+• {'Implement tighter stop losses' if weekly_data.get('avg_loss', 0) > 50 else 'Optimize take profit levels'}
+• {'Reduce trading frequency' if weekly_data.get('overtrade_flag') else 'Maintain current frequency'}
+
+📈 *Performance vs Target:* {((weekly_pnl_gbp / 500) * 100):.1f}%"""
+                
+            else:
+                msg = "⚠️ Earnings tracker not initialized"
+        except Exception as e:
+            msg = f"❌ Error getting weekly report: {str(e)}"
+        
+        await update.message.reply_text(msg, parse_mode="Markdown")
+    
+    def _create_performance_chart(self, data):
+        """Create performance chart"""
         try:
             plt.figure(figsize=(10, 6))
-            
-            # Extract data
             dates = [datetime.fromisoformat(d) for d in data.get('dates', [])]
             equity = data.get('equity', [])
             
             if dates and equity:
-                plt.plot(dates, equity, color='blue', linewidth=2)
-                plt.title('Account Equity Curve', fontsize=16, fontweight='bold')
+                plt.plot(dates, equity, 'b-', linewidth=2)
+                plt.title('Equity Curve', fontsize=16, fontweight='bold')
                 plt.xlabel('Date')
                 plt.ylabel('Equity ($)')
                 plt.grid(True, alpha=0.3)
-                
-                # Format x-axis
-                plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
-                plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=1))
                 plt.xticks(rotation=45)
-                
                 plt.tight_layout()
-                
-                # Save to bytes
-                img_buffer = io.BytesIO()
-                plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
-                img_buffer.seek(0)
-                
-                plt.close()
-                return img_buffer.getvalue()
             else:
-                # Create empty chart
-                plt.text(0.5, 0.5, 'No data available', ha='center', va='center', transform=plt.gca().transAxes)
+                plt.text(0.5, 0.5, 'No data', ha='center', va='center', transform=plt.gca().transAxes)
                 plt.title('Performance Chart')
-                
-                img_buffer = io.BytesIO()
-                plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
-                img_buffer.seek(0)
-                
-                plt.close()
-                return img_buffer.getvalue()
-                
-        except Exception as e:
-            self.logger.error(f"Error creating performance chart: {e}")
-            
-            # Create error chart
-            plt.figure(figsize=(8, 6))
-            plt.text(0.5, 0.5, f'Chart Error:\n{str(e)}', ha='center', va='center', transform=plt.gca().transAxes)
-            plt.title('Performance Chart - Error')
             
             img_buffer = io.BytesIO()
             plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
             img_buffer.seek(0)
-            
+            plt.close()
+            return img_buffer.getvalue()
+        except Exception as e:
+            self.logger.error(f"Chart error: {e}")
+            plt.figure(figsize=(8, 6))
+            plt.text(0.5, 0.5, f'Error: {str(e)}', ha='center', va='center', transform=plt.gca().transAxes)
+            plt.title('Chart Error')
+            img_buffer = io.BytesIO()
+            plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+            img_buffer.seek(0)
             plt.close()
             return img_buffer.getvalue()

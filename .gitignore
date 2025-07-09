@@ -1,21 +1,21 @@
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+
+# Distribution / packaging
 *.egg-info/
+
+# Logs
 *.log
 
-# Virtualenv
+# Virtual environments
 venv/
+
+# Environment variables
 .env
 
-# Jupyter
+# Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
-# System
+# macOS system files
 .DS_Store
-venv/
-__pycache__/
-venv/
-__pycache__/
-.env
-.env

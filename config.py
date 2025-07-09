@@ -20,13 +20,22 @@ class Config:
     FXOPEN_BASE_URL = os.getenv("FXOPEN_BASE_URL", "https://restapi.fxopen.com:8443")
     
     # Trading Configuration
-    MAX_RISK_PERCENT = float(os.getenv("MAX_RISK_PERCENT", "2.0"))
-    MAX_DAILY_LOSS_PERCENT = float(os.getenv("MAX_DAILY_LOSS_PERCENT", "5.0"))
+    MAX_RISK_PERCENT = float(os.getenv("MAX_RISK_PERCENT", "2.0"))  # % of account balance risked per trade
+    MAX_DAILY_LOSS_PERCENT = float(os.getenv("MAX_DAILY_LOSS_PERCENT", "5.0"))  # max daily loss before stop trading
     MAX_OPEN_POSITIONS = int(os.getenv("MAX_OPEN_POSITIONS", "5"))
     DEFAULT_LEVERAGE = int(os.getenv("DEFAULT_LEVERAGE", "33"))
     
+    # Profit and Risk Ratios (Dynamic)
+    PROFIT_TARGET_MULTIPLIER = float(os.getenv("PROFIT_TARGET_MULTIPLIER", "2.0"))  # Take profit ratio vs stop loss
+    ADAPTIVE_RISK_SCALING = os.getenv("ADAPTIVE_RISK_SCALING", "true").lower() == "true"  # Scale risk by recent performance
+    RISK_SCALING_FACTOR = float(os.getenv("RISK_SCALING_FACTOR", "0.1"))  # % risk scale change per win/loss streak
+    
+    # Cooldown and Streak Management
+    MAX_CONSECUTIVE_LOSSES = int(os.getenv("MAX_CONSECUTIVE_LOSSES", "3"))
+    COOLDOWN_PERIOD_MINUTES = int(os.getenv("COOLDOWN_PERIOD_MINUTES", "30"))  # Pause trading after loss streak
+    
     # AI Analysis Configuration
-    AI_MODEL = "gpt-4o"  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024
+    AI_MODEL = "gpt-4o"  # newest OpenAI model
     AI_TEMPERATURE = float(os.getenv("AI_TEMPERATURE", "0.3"))
     AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "1000"))
     
@@ -42,13 +51,12 @@ class Config:
     
     # Risk Management
     STOP_LOSS_PIPS = int(os.getenv("STOP_LOSS_PIPS", "20"))
-    TAKE_PROFIT_PIPS = int(os.getenv("TAKE_PROFIT_PIPS", "40"))
+    TAKE_PROFIT_PIPS = int(float(os.getenv("STOP_LOSS_PIPS", "20")) * PROFIT_TARGET_MULTIPLIER)  # Dynamic based on multiplier
     MAX_SPREAD_PIPS = int(os.getenv("MAX_SPREAD_PIPS", "3"))
     
     # Failsafe Configuration
     ENABLE_FAILSAFE = os.getenv("ENABLE_FAILSAFE", "true").lower() == "true"
     CLOSE_POSITIONS_ON_STOP = os.getenv("CLOSE_POSITIONS_ON_STOP", "false").lower() == "true"
-    MAX_CONSECUTIVE_LOSSES = int(os.getenv("MAX_CONSECUTIVE_LOSSES", "3"))
     
     # Logging Configuration
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -68,10 +76,7 @@ class Config:
             'FXOPEN_API_SECRET'
         ]
         
-        missing_vars = []
-        for var in required_vars:
-            if not getattr(cls, var):
-                missing_vars.append(var)
+        missing_vars = [var for var in required_vars if not getattr(cls, var)]
         
         if missing_vars:
             print(f"Missing required environment variables: {', '.join(missing_vars)}")
@@ -91,7 +96,12 @@ class Config:
             'take_profit_pips': cls.TAKE_PROFIT_PIPS,
             'max_spread_pips': cls.MAX_SPREAD_PIPS,
             'currencies': cls.CURRENCIES,
-            'timeframes': cls.TIMEFRAMES
+            'timeframes': cls.TIMEFRAMES,
+            'profit_target_multiplier': cls.PROFIT_TARGET_MULTIPLIER,
+            'adaptive_risk_scaling': cls.ADAPTIVE_RISK_SCALING,
+            'risk_scaling_factor': cls.RISK_SCALING_FACTOR,
+            'max_consecutive_losses': cls.MAX_CONSECUTIVE_LOSSES,
+            'cooldown_period_minutes': cls.COOLDOWN_PERIOD_MINUTES,
         }
     
     @classmethod
