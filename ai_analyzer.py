@@ -1,106 +1,74 @@
-"""
-AI Market Analyzer using OpenAI API
-Provides market analysis and trading signals
-"""
-
 import json
 import logging
-from typing import Dict, List, Any
+from typing import Dict, Any
 from datetime import datetime
+import httpx
+import asyncio
 
-from openai import AsyncOpenAI
 from config import Config
-
 
 class AIAnalyzer:
     def __init__(self) -> None:
-        self.client = AsyncOpenAI(api_key=Config.OPENAI_API_KEY)
         self.logger = logging.getLogger(__name__)
-
+        self.hf_token = Config.HF_API_TOKEN  # Set this in your config
+        self.hf_model = Config.HF_MODEL_NAME  # e.g. "gpt2" or your preferred HF model
+        self.api_url = f"https://api-inference.huggingface.co/models/{self.hf_model}"
+        self.headers = {"Authorization": f"Bearer {self.hf_token}"}
+        self.client = httpx.AsyncClient(timeout=30.0)
+    
     async def test_connection(self) -> bool:
-        """Test OpenAI API connection"""
+        """Test HF API connection by sending a simple prompt"""
         try:
-            await self.client.chat.completions.create(
-                model=Config.AI_MODEL,
-                messages=[{"role": "user", "content": "Test connection"}],
-                max_tokens=10,
-            )
+            payload = {"inputs": "Test connection"}
+            response = await self.client.post(self.api_url, headers=self.headers, json=payload)
+            response.raise_for_status()
             return True
         except Exception as e:
-            self.logger.error(f"OpenAI connection test failed: {e}")
+            self.logger.error(f"Hugging Face connection test failed: {e}")
             raise
 
     async def analyze_market_data(self, market_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Analyze market data and provide trading recommendations.
-
-        Args:
-            market_data: Dictionary containing price data, indicators, and market info
-
-        Returns:
-            Dictionary with analysis results and trading signals
-        """
         try:
-            analysis_prompt = self._prepare_analysis_prompt(market_data)
-
-            response = await self.client.chat.completions.create(
-                model=Config.AI_MODEL,
-                messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
-                    {"role": "user", "content": analysis_prompt},
-                ],
-                response_format={"type": "json_object"},
-                temperature=Config.AI_TEMPERATURE,
-                max_tokens=Config.AI_MAX_TOKENS,
-            )
-
-            analysis_result = json.loads(response.choices[0].message.content)
+            prompt = self._prepare_analysis_prompt(market_data)
+            response_text = await self._call_hf_api(prompt)
+            analysis_result = self._parse_response(response_text)
             validated_result = self._validate_analysis_result(analysis_result, market_data)
-            self.logger.info(f"AI analysis completed for {market_data.get('symbol', 'unknown')}")
+            self.logger.info(f"HF AI analysis completed for {market_data.get('symbol', 'unknown')}")
             return validated_result
-
         except Exception as e:
             self.logger.error(f"Error in AI market analysis: {e}")
             return self._get_default_analysis()
 
-    def _get_system_prompt(self) -> str:
-        return (
-            "You are an expert forex trading analyst with deep knowledge of technical analysis, fundamental analysis, and market psychology.\n\n"
-            "Your task is to analyze the provided market data and provide a comprehensive trading recommendation.\n\n"
-            "You must respond with a JSON object containing:\n"
-            "{\n"
-            '    "signal": "BUY" | "SELL" | "HOLD",\n'
-            '    "confidence": float (0.0 to 1.0),\n'
-            '    "entry_price": float,\n'
-            '    "stop_loss": float,\n'
-            '    "take_profit": float,\n'
-            '    "risk_reward_ratio": float,\n'
-            '    "analysis": {\n'
-            '        "technical": "detailed technical analysis",\n'
-            '        "fundamental": "fundamental factors",\n'
-            '        "sentiment": "market sentiment analysis",\n'
-            '        "risk_factors": ["list of risk factors"]\n'
-            '    },\n'
-            '    "timeframe": "recommended holding period",\n'
-            '    "position_size_percent": float (percentage of account to risk),\n'
-            '    "reasons": ["key reasons for the recommendation"]\n'
-            "}\n\n"
-            "Consider:\n"
-            "- Technical indicators and patterns\n"
-            "- Support/resistance levels\n"
-            "- Market volatility\n"
-            "- Economic events and news\n"
-            "- Risk management principles\n"
-            "- Current market conditions"
-        )
+    async def _call_hf_api(self, prompt: str) -> str:
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": Config.AI_MAX_TOKENS,
+                "temperature": Config.AI_TEMPERATURE,
+                "return_full_text": False,
+            }
+        }
+        try:
+            response = await self.client.post(self.api_url, headers=self.headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            # HF generative models return list of dicts with 'generated_text' key
+            if isinstance(data, list) and len(data) > 0 and 'generated_text' in data[0]:
+                return data[0]['generated_text']
+            elif isinstance(data, dict) and 'error' in data:
+                raise RuntimeError(f"Hugging Face API error: {data['error']}")
+            else:
+                return str(data)
+        except Exception as e:
+            self.logger.error(f"HF API call failed: {e}")
+            raise
 
     def _prepare_analysis_prompt(self, market_data: Dict[str, Any]) -> str:
         symbol = market_data.get("symbol", "Unknown")
         current_price = market_data.get("current_price", 0)
-
         prompt = (
             f"Analyze the following forex market data for {symbol}:\n\n"
-            "PRICE DATA:\n"
+            f"PRICE DATA:\n"
             f"- Current Price: {current_price}\n"
             f"- Open: {market_data.get('open', 0)}\n"
             f"- High: {market_data.get('high', 0)}\n"
@@ -108,30 +76,44 @@ class AIAnalyzer:
             f"- Previous Close: {market_data.get('prev_close', 0)}\n\n"
             "TECHNICAL INDICATORS:\n"
         )
-
         indicators = market_data.get("indicators", {})
         for indicator, value in indicators.items():
             prompt += f"- {indicator}: {value}\n"
-
         if "volume" in market_data:
             prompt += f"- Volume: {market_data['volume']}\n"
         if "spread" in market_data:
             prompt += f"- Spread: {market_data['spread']} pips\n"
-
         if "timeframe_analysis" in market_data:
             prompt += "\nMULTI-TIMEFRAME ANALYSIS:\n"
             for tf, data in market_data["timeframe_analysis"].items():
                 prompt += f"- {tf}: {data}\n"
-
         prompt += (
             f"\nMARKET CONTEXT:\n"
             f"- Trading Session: {market_data.get('session', 'Unknown')}\n"
             f"- Market Volatility: {market_data.get('volatility', 'Normal')}\n"
             f"- Recent News Impact: {market_data.get('news_impact', 'None')}\n\n"
-            "Please provide a comprehensive analysis and trading recommendation."
+            "Please provide a trading recommendation in JSON format with fields:\n"
+            "signal (BUY, SELL, HOLD), confidence (0.0 to 1.0), entry_price, stop_loss, take_profit,\n"
+            "risk_reward_ratio, analysis details, timeframe, position_size_percent, reasons."
         )
-
         return prompt
+
+    def _parse_response(self, text: str) -> Dict[str, Any]:
+        """Attempt to parse AI response as JSON, fallback to empty analysis"""
+        try:
+            # Some HF models output text directly without JSON structure
+            # Try extracting JSON from text if present
+            start = text.find("{")
+            end = text.rfind("}") + 1
+            if start != -1 and end != -1:
+                json_text = text[start:end]
+                return json.loads(json_text)
+            else:
+                self.logger.warning("No JSON object found in HF response, returning default analysis")
+                return self._get_default_analysis()
+        except Exception as e:
+            self.logger.error(f"Error parsing HF response JSON: {e}")
+            return self._get_default_analysis()
 
     def _validate_analysis_result(self, analysis: Dict[str, Any], market_data: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -199,25 +181,5 @@ class AIAnalyzer:
             "symbol": "Unknown",
         }
 
-    async def analyze_news_sentiment(self, news_data: List[Dict[str, Any]]) -> Dict[str, Any]:
-        try:
-            if not news_data:
-                return {"sentiment": "neutral", "impact": "low", "confidence": 0.0}
-
-            news_text = self._prepare_news_text(news_data)
-
-            response = await self.client.chat.completions.create(
-                model=Config.AI_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a financial news analyst. Analyze the provided news and assess its potential impact on forex markets.\n\n"
-                            "Respond with JSON:\n"
-                            "{\n"
-                            '    "sentiment": "bullish" | "bearish" | "neutral",\n'
-                            '    "impact": "high" | "medium" | "low",\n'
-                            '    "confidence": float (0.0 to 1.0),\n'
-                            '    "key_factors": ["list of key factors"],\n'
-                            '    "affected_currencies": ["list of currency codes"],\n'
-                            '    "time_horizon": "im
+    async def close(self):
+        await self.client.aclose()
