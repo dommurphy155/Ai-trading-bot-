@@ -5,24 +5,25 @@ Screenshot Capture Module for Trade Documentation
 import os
 import logging
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
+
 
 class Screenshot:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.screenshot_dir = "screenshots"
         os.makedirs(self.screenshot_dir, exist_ok=True)
-    
+
     async def capture_trade_screenshot(self, trade_data: Dict[str, Any]) -> Optional[str]:
         """
         Capture screenshot for trade documentation
-        
+
         Args:
-            trade_data: Trade information dictionary
-            
+            trade_data: Trade info dict
+
         Returns:
-            Screenshot filename or None if failed
+            Filename or None on failure
         """
         try:
             timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
@@ -30,142 +31,124 @@ class Screenshot:
             side = trade_data.get('side', 'UNKNOWN')
             filename = f"trade_{symbol}_{side}_{timestamp}.png"
             filepath = os.path.join(self.screenshot_dir, filename)
-            
-            screenshot_success = await self._create_trade_image(trade_data, filepath)
-            
-            if screenshot_success:
+
+            success = await self._create_trade_image(trade_data, filepath)
+            if success:
                 self.logger.info(f"Screenshot captured: {filename}")
                 return filename
             else:
                 self.logger.warning("Failed to capture screenshot")
                 return None
-                
         except Exception as e:
             self.logger.error(f"Error capturing trade screenshot: {e}")
             return None
-    
+
     async def _create_trade_image(self, trade_data: Dict[str, Any], filepath: str) -> bool:
         """
-        Create a visual representation of the trade.
-        Currently, this saves a text file with trade info as placeholder.
+        Create a visual trade snapshot.
+        Current placeholder: saves trade info text file alongside fake .png name.
         """
         try:
-            trade_info = f"""
-TRADE SCREENSHOT
-================
-Timestamp: {trade_data.get('timestamp', 'Unknown')}
-Symbol: {trade_data.get('symbol', 'Unknown')}
-Side: {trade_data.get('side', 'Unknown')}
-Volume: {trade_data.get('volume', 'Unknown')}
-Entry Price: {trade_data.get('entry_price', 'Unknown')}
-Stop Loss: {trade_data.get('stop_loss', 'Unknown')}
-Take Profit: {trade_data.get('take_profit', 'Unknown')}
-AI Confidence: {trade_data.get('confidence', 0) * 100:.1f}%
-Reason: {trade_data.get('reason', 'Unknown')}
-================
-            """
-            text_filepath = filepath.replace('.png', '.txt')
-            with open(text_filepath, 'w') as f:
+            trade_info = (
+                f"TRADE SCREENSHOT\n"
+                f"================\n"
+                f"Timestamp: {trade_data.get('timestamp', 'Unknown')}\n"
+                f"Symbol: {trade_data.get('symbol', 'Unknown')}\n"
+                f"Side: {trade_data.get('side', 'Unknown')}\n"
+                f"Volume: {trade_data.get('volume', 'Unknown')}\n"
+                f"Entry Price: {trade_data.get('entry_price', 'Unknown')}\n"
+                f"Stop Loss: {trade_data.get('stop_loss', 'Unknown')}\n"
+                f"Take Profit: {trade_data.get('take_profit', 'Unknown')}\n"
+                f"AI Confidence: {trade_data.get('confidence', 0)*100:.1f}%\n"
+                f"Reason: {trade_data.get('reason', 'Unknown')}\n"
+                f"================\n"
+            )
+            text_path = filepath.replace('.png', '.txt')
+            with open(text_path, 'w', encoding='utf-8') as f:
                 f.write(trade_info)
-            
             return True
-            
         except Exception as e:
             self.logger.error(f"Error creating trade image: {e}")
             return False
-    
+
     async def capture_account_screenshot(self) -> Optional[str]:
-        """Capture account status screenshot"""
+        """Capture account status placeholder screenshot"""
         try:
             timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
             filename = f"account_status_{timestamp}.png"
             filepath = os.path.join(self.screenshot_dir, filename)
-            
-            account_info = f"""
-ACCOUNT STATUS SCREENSHOT
-========================
-Timestamp: {datetime.utcnow().isoformat()}
-Note: This is a placeholder for actual screenshot functionality
-In production, this would capture the actual trading interface
-========================
-            """
-            text_filepath = filepath.replace('.png', '.txt')
-            with open(text_filepath, 'w') as f:
-                f.write(account_info)
-            
+
+            info = (
+                f"ACCOUNT STATUS SCREENSHOT\n"
+                f"========================\n"
+                f"Timestamp: {datetime.utcnow().isoformat()}\n"
+                f"Note: Placeholder - replace with real screenshot logic\n"
+                f"========================\n"
+            )
+            text_path = filepath.replace('.png', '.txt')
+            with open(text_path, 'w', encoding='utf-8') as f:
+                f.write(info)
+
             self.logger.info(f"Account screenshot captured: {filename}")
             return filename
-            
         except Exception as e:
             self.logger.error(f"Error capturing account screenshot: {e}")
             return None
-    
+
     async def capture_chart_screenshot(self, symbol: str, timeframe: str) -> Optional[str]:
-        """Capture chart screenshot for analysis"""
+        """Capture chart screenshot placeholder"""
         try:
             timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
             filename = f"chart_{symbol}_{timeframe}_{timestamp}.png"
             filepath = os.path.join(self.screenshot_dir, filename)
-            
-            chart_info = f"""
-CHART SCREENSHOT
-===============
-Symbol: {symbol}
-Timeframe: {timeframe}
-Timestamp: {datetime.utcnow().isoformat()}
-Note: This is a placeholder for actual chart screenshot
-===============
-            """
-            text_filepath = filepath.replace('.png', '.txt')
-            with open(text_filepath, 'w') as f:
-                f.write(chart_info)
-            
+
+            info = (
+                f"CHART SCREENSHOT\n"
+                f"===============\n"
+                f"Symbol: {symbol}\n"
+                f"Timeframe: {timeframe}\n"
+                f"Timestamp: {datetime.utcnow().isoformat()}\n"
+                f"Note: Placeholder - replace with real chart capture\n"
+                f"===============\n"
+            )
+            text_path = filepath.replace('.png', '.txt')
+            with open(text_path, 'w', encoding='utf-8') as f:
+                f.write(info)
+
             self.logger.info(f"Chart screenshot captured: {filename}")
             return filename
-            
         except Exception as e:
             self.logger.error(f"Error capturing chart screenshot: {e}")
             return None
-    
+
     async def cleanup_old_screenshots(self, days_to_keep: int = 7):
-        """Clean up old screenshots to save disk space"""
+        """Delete screenshots older than days_to_keep"""
         try:
-            import time
-            current_time = time.time()
-            cutoff_time = current_time - (days_to_keep * 24 * 60 * 60)
-            deleted_count = 0
-            
-            for filename in os.listdir(self.screenshot_dir):
-                filepath = os.path.join(self.screenshot_dir, filename)
-                if os.path.isfile(filepath):
-                    file_time = os.path.getmtime(filepath)
-                    if file_time < cutoff_time:
-                        try:
-                            os.remove(filepath)
-                            deleted_count += 1
-                        except OSError as e:
-                            self.logger.warning(f"Could not delete {filepath}: {e}")
-            
-            self.logger.info(f"Cleaned up {deleted_count} old screenshots")
-            
+            cutoff = time.time() - days_to_keep * 86400
+            deleted = 0
+            for fname in os.listdir(self.screenshot_dir):
+                path = os.path.join(self.screenshot_dir, fname)
+                if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
+                    try:
+                        os.remove(path)
+                        deleted += 1
+                    except OSError as e:
+                        self.logger.warning(f"Failed to delete {path}: {e}")
+            self.logger.info(f"Deleted {deleted} old screenshots")
         except Exception as e:
             self.logger.error(f"Error cleaning up old screenshots: {e}")
-    
+
     async def get_screenshot_path(self, filename: str) -> str:
-        """Get full path to screenshot file"""
         return os.path.join(self.screenshot_dir, filename)
-    
+
     async def screenshot_exists(self, filename: str) -> bool:
-        """Check if screenshot file exists"""
-        filepath = os.path.join(self.screenshot_dir, filename)
-        return os.path.exists(filepath)
-    
+        return os.path.exists(os.path.join(self.screenshot_dir, filename))
+
     async def get_screenshot_data(self, filename: str) -> Optional[bytes]:
-        """Get screenshot data as bytes"""
         try:
-            filepath = os.path.join(self.screenshot_dir, filename)
-            if os.path.exists(filepath):
-                with open(filepath, 'rb') as f:
+            path = os.path.join(self.screenshot_dir, filename)
+            if os.path.exists(path):
+                with open(path, 'rb') as f:
                     return f.read()
             else:
                 self.logger.warning(f"Screenshot file not found: {filename}")
@@ -173,17 +156,16 @@ Note: This is a placeholder for actual chart screenshot
         except Exception as e:
             self.logger.error(f"Error reading screenshot data: {e}")
             return None
-    
-    async def get_screenshot_list(self) -> list:
-        """Get list of all screenshot files"""
+
+    async def get_screenshot_list(self) -> List[dict]:
         try:
             files = []
-            for filename in os.listdir(self.screenshot_dir):
-                filepath = os.path.join(self.screenshot_dir, filename)
-                if os.path.isfile(filepath):
-                    stat = os.stat(filepath)
+            for fname in os.listdir(self.screenshot_dir):
+                path = os.path.join(self.screenshot_dir, fname)
+                if os.path.isfile(path):
+                    stat = os.stat(path)
                     files.append({
-                        'filename': filename,
+                        'filename': fname,
                         'size': stat.st_size,
                         'created': datetime.fromtimestamp(stat.st_ctime).isoformat(),
                         'modified': datetime.fromtimestamp(stat.st_mtime).isoformat()

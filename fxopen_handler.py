@@ -24,13 +24,13 @@ class FXOpenHandler:
         self.logger = logging.getLogger(__name__)
         self.session: Optional[aiohttp.ClientSession] = None
 
-        # Aggressive trading control variables
-        self.trade_cooldown = timedelta(seconds=10)  # minimum seconds between trades
+        # Aggressive trading controls
+        self.trade_cooldown = timedelta(seconds=10)  # Min seconds between trades
         self.last_trade_time: Optional[datetime] = None
-        self.max_drawdown_pct = 0.15  # 15% max drawdown before emergency close all
+        self.max_drawdown_pct = 0.15  # 15% max drawdown threshold
         self.recent_wins = 0
         self.recent_losses = 0
-        self.performance_window = 20  # last 20 trades for dynamic risk
+        self.performance_window = 20  # Last 20 trades for dynamic risk
         self.trade_history: List[Dict[str, Any]] = []
 
     async def __aenter__(self):
@@ -38,7 +38,7 @@ class FXOpenHandler:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.session:
+        if self.session and not self.session.closed:
             await self.session.close()
             self.session = None
 
@@ -73,29 +73,26 @@ class FXOpenHandler:
                 data=payload_str if payload else None,
                 timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
-
-                response_text = await response.text()
-
+                text = await response.text()
                 if response.status == 200:
                     try:
-                        return json.loads(response_text)
+                        return json.loads(text)
                     except json.JSONDecodeError:
-                        return {"success": True, "data": response_text}
+                        return {"success": True, "data": text}
                 else:
-                    error_msg = f"FXOpen API error: {response.status} - {response_text}"
-                    self.logger.error(error_msg)
-                    raise Exception(error_msg)
-
+                    err = f"FXOpen API error: {response.status} - {text}"
+                    self.logger.error(err)
+                    raise Exception(err)
         except asyncio.TimeoutError:
-            error_msg = "FXOpen API request timeout"
-            self.logger.error(error_msg)
-            raise Exception(error_msg)
+            err = "FXOpen API request timeout"
+            self.logger.error(err)
+            raise Exception(err)
         except Exception as e:
-            error_msg = f"FXOpen API request failed: {str(e)}"
-            self.logger.error(error_msg)
-            raise Exception(error_msg)
+            err = f"FXOpen API request failed: {str(e)}"
+            self.logger.error(err)
+            raise Exception(err)
 
-    # ----- Core Trading API Methods -----
+    # Core API Methods
 
     async def test_connection(self) -> bool:
         try:
@@ -118,10 +115,10 @@ class FXOpenHandler:
 
     async def get_positions(self) -> List[Dict[str, Any]]:
         endpoint = f"/accounts/{self.login}/positions"
-        response = await self._make_request("GET", endpoint)
-        if isinstance(response, list):
-            return response
-        return response.get('positions', [])
+        resp = await self._make_request("GET", endpoint)
+        if isinstance(resp, list):
+            return resp
+        return resp.get('positions', [])
 
     async def close_position(self, position_id: str, volume: Optional[float] = None) -> Dict[str, Any]:
         payload = {'PositionId': position_id}
@@ -145,62 +142,58 @@ class FXOpenHandler:
         return results
 
     async def modify_position(self, position_id: str, stop_loss: Optional[float] = None, take_profit: Optional[float] = None) -> Dict[str, Any]:
+        if stop_loss is None and take_profit is None:
+            raise ValueError("Must provide stop_loss and/or take_profit")
         payload = {}
         if stop_loss is not None:
             payload['StopLoss'] = float(stop_loss)
         if take_profit is not None:
             payload['TakeProfit'] = float(take_profit)
-        if not payload:
-            raise ValueError("Must provide stop_loss and/or take_profit")
         endpoint = f"/accounts/{self.login}/positions/{position_id}/modify"
         return await self._make_request("PUT", endpoint, payload)
 
     async def get_market_data(self, symbol: str) -> Dict[str, Any]:
         endpoint = f"/symbols/{symbol}/quotes"
-        response = await self._make_request("GET", endpoint)
-        if response:
-            bid = float(response.get('Bid', 0))
-            ask = float(response.get('Ask', 0))
-            spread = float(response.get('Spread', 0))
-            mid_price = (bid + ask) / 2
+        resp = await self._make_request("GET", endpoint)
+        if resp:
+            bid = float(resp.get('Bid', 0))
+            ask = float(resp.get('Ask', 0))
+            spread = float(resp.get('Spread', 0))
+            mid = (bid + ask) / 2
             return {
                 'symbol': symbol,
                 'bid': bid,
                 'ask': ask,
                 'spread': spread,
-                'current_price': mid_price,
+                'current_price': mid,
                 'timestamp': datetime.utcnow().isoformat()
             }
         raise Exception(f"No market data for {symbol}")
 
     async def get_symbols(self) -> List[Dict[str, Any]]:
         endpoint = "/symbols"
-        response = await self._make_request("GET", endpoint)
-        if isinstance(response, list):
-            return response
-        return response.get('symbols', [])
+        resp = await self._make_request("GET", endpoint)
+        if isinstance(resp, list):
+            return resp
+        return resp.get('symbols', [])
 
     async def place_order(self, order_params: Dict[str, Any]) -> Dict[str, Any]:
-        # Enforce cooldown
+        # Enforce trade cooldown
         if self.last_trade_time and (datetime.utcnow() - self.last_trade_time) < self.trade_cooldown:
             raise Exception("Trade cooldown active - too soon to place another trade")
 
-        # Dynamic risk adjustment based on recent performance
         risk_amount = self.dynamic_risk_amount()
 
-        # Calculate position size with risk adjustment
         position_size = await self.calculate_position_size(
             order_params['symbol'], risk_amount, order_params.get('stop_loss_pips', 20)
         )
         order_params['volume'] = position_size
 
-        # Validate risk/reward before placing
         if not self.validate_risk_reward(
             order_params['entry_price'], order_params.get('stop_loss'), order_params.get('take_profit')
         ):
             raise Exception("Risk:Reward ratio below 1.5 - rejecting trade")
 
-        # Prepare order payload
         payload = {
             'Symbol': order_params['symbol'],
             'Side': order_params['side'].upper(),
@@ -216,13 +209,11 @@ class FXOpenHandler:
         if 'comment' in order_params:
             payload['Comment'] = order_params['comment']
 
-        response = await self._make_request("POST", f"/accounts/{self.login}/orders", payload)
+        resp = await self._make_request("POST", f"/accounts/{self.login}/orders", payload)
         self.last_trade_time = datetime.utcnow()
         self.logger.info(f"Placed order: {payload['Symbol']} {payload['Side']} {payload['Volume']} lots")
-
-        # Log trade to history
         self.log_trade(order_params, success=True)
-        return response
+        return resp
 
     async def calculate_position_size(self, symbol: str, risk_amount: float, stop_loss_pips: int) -> float:
         try:
@@ -233,7 +224,7 @@ class FXOpenHandler:
                 raise Exception(f"Symbol info not found for {symbol}")
 
             pip_size = float(symbol_info.get('PipSize', 0.0001))
-            lot_size = 100000  # Standard lot
+            lot_size = 100000  # Standard lot size
 
             pip_value = pip_size * lot_size
             risk_per_pip = risk_amount / stop_loss_pips if stop_loss_pips > 0 else risk_amount
@@ -247,3 +238,44 @@ class FXOpenHandler:
 
         except Exception as e:
             self.logger.error(f"Position size calculation error: {e}")
+            raise
+
+    def dynamic_risk_amount(self) -> float:
+        """Calculate risk amount based on recent performance"""
+        # Basic placeholder: risk more after wins, less after losses
+        base_risk = 100  # $100 base risk per trade
+        performance_factor = (self.recent_wins - self.recent_losses) / max(self.performance_window, 1)
+        adjusted_risk = base_risk * (1 + performance_factor)
+        adjusted_risk = max(20, min(adjusted_risk, 500))  # Clamp risk between $20 and $500
+        return adjusted_risk
+
+    def validate_risk_reward(self, entry_price: float, stop_loss: Optional[float], take_profit: Optional[float]) -> bool:
+        """Check if risk:reward >= 1.5"""
+        if stop_loss is None or take_profit is None:
+            return False
+        risk = abs(entry_price - stop_loss)
+        reward = abs(take_profit - entry_price)
+        if risk == 0:
+            return False
+        ratio = reward / risk
+        return ratio >= 1.5
+
+    def log_trade(self, order_params: Dict[str, Any], success: bool) -> None:
+        record = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "symbol": order_params.get("symbol"),
+            "side": order_params.get("side"),
+            "volume": order_params.get("volume"),
+            "entry_price": order_params.get("entry_price"),
+            "stop_loss": order_params.get("stop_loss"),
+            "take_profit": order_params.get("take_profit"),
+            "success": success,
+        }
+        self.trade_history.append(record)
+        # Maintain only recent trades
+        if len(self.trade_history) > self.performance_window:
+            self.trade_history.pop(0)
+        if success:
+            self.recent_wins += 1
+        else:
+            self.recent_losses += 1

@@ -4,7 +4,6 @@ AI Trading Bot - Main Entry Point
 Integrates OpenAI analysis, FXOpen trading, and Telegram monitoring
 """
 
-import os
 import asyncio
 import logging
 import signal
@@ -24,39 +23,34 @@ from logger import setup_logging
 
 
 class TradingBotApp:
-    def __init__(self):
-        self.running = False
-        self.ai_analyzer = None
-        self.fxopen_handler = None
-        self.telegram_bot = None
-        self.trader = None
-        self.earnings_tracker = None
-        self.screenshot = None
-        self.failsafe = None
+    def __init__(self) -> None:
+        self.running: bool = False
+        self.ai_analyzer: AIAnalyzer | None = None
+        self.fxopen_handler: FXOpenHandler | None = None
+        self.telegram_bot: TelegramBot | None = None
+        self.trader: Trader | None = None
+        self.earnings_tracker: EarningsTracker | None = None
+        self.screenshot: Screenshot | None = None
+        self.failsafe: FailsafeManager | None = None
         self.logger = logging.getLogger(__name__)
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         """Initialize all bot components"""
         try:
-            # Load environment variables
             load_dotenv()
 
-            # Setup logging
             setup_logging()
             self.logger.info("Starting AI Trading Bot initialization...")
 
-            # Validate configuration
             if not Config.validate():
                 raise ValueError("Invalid configuration. Check your environment variables.")
 
-            # Initialize components
             self.ai_analyzer = AIAnalyzer()
             self.fxopen_handler = FXOpenHandler()
             self.earnings_tracker = EarningsTracker()
             self.screenshot = Screenshot()
             self.failsafe = FailsafeManager()
 
-            # Initialize trader with dependencies
             self.trader = Trader(
                 ai_analyzer=self.ai_analyzer,
                 fxopen_handler=self.fxopen_handler,
@@ -65,27 +59,22 @@ class TradingBotApp:
                 failsafe=self.failsafe,
             )
 
-            # Initialize Telegram bot
             self.telegram_bot = TelegramBot(
                 trader=self.trader,
                 earnings_tracker=self.earnings_tracker,
                 fxopen_handler=self.fxopen_handler,
             )
 
-            # Test connections
             await self._test_connections()
-
             self.logger.info("Bot initialization completed successfully")
 
         except Exception as e:
             self.logger.error(f"Failed to initialize bot: {e}")
             raise
 
-    async def _test_connections(self):
-        """Test all external service connections"""
+    async def _test_connections(self) -> None:
         self.logger.info("Testing external service connections...")
 
-        # Test OpenAI connection
         try:
             await self.ai_analyzer.test_connection()
             self.logger.info("✓ OpenAI connection successful")
@@ -93,7 +82,6 @@ class TradingBotApp:
             self.logger.error(f"✗ OpenAI connection failed: {e}")
             raise
 
-        # Test FXOpen connection
         try:
             await self.fxopen_handler.test_connection()
             self.logger.info("✓ FXOpen connection successful")
@@ -101,7 +89,6 @@ class TradingBotApp:
             self.logger.error(f"✗ FXOpen connection failed: {e}")
             raise
 
-        # Test Telegram connection
         try:
             await self.telegram_bot.test_connection()
             self.logger.info("✓ Telegram connection successful")
@@ -109,16 +96,13 @@ class TradingBotApp:
             self.logger.error(f"✗ Telegram connection failed: {e}")
             raise
 
-    async def start(self):
-        """Start the trading bot"""
+    async def start(self) -> None:
         self.running = True
         self.logger.info("Starting AI Trading Bot...")
 
         try:
-            # Send startup notification
             await self.telegram_bot.send_startup_notification()
 
-            # Start background tasks
             tasks = [
                 asyncio.create_task(self.trader.start_trading_loop()),
                 asyncio.create_task(self.telegram_bot.start_polling()),
@@ -126,33 +110,28 @@ class TradingBotApp:
                 asyncio.create_task(self._monitor_system_health()),
             ]
 
-            # Wait for tasks
             await asyncio.gather(*tasks, return_exceptions=True)
 
         except Exception as e:
             self.logger.error(f"Bot execution error: {e}")
-            await self.telegram_bot.send_error_notification(str(e))
+            if self.telegram_bot:
+                await self.telegram_bot.send_error_notification(str(e))
             raise
 
-    async def _periodic_status_update(self):
-        """Send periodic status updates via Telegram"""
+    async def _periodic_status_update(self) -> None:
         while self.running:
             try:
                 await asyncio.sleep(Config.STATUS_UPDATE_INTERVAL)
-
                 if self.running:
                     status = await self._get_system_status()
                     await self.telegram_bot.send_status_update(status)
-
             except Exception as e:
                 self.logger.error(f"Error in periodic status update: {e}")
 
-    async def _monitor_system_health(self):
-        """Monitor system health and trigger failsafes if needed"""
+    async def _monitor_system_health(self) -> None:
         while self.running:
             try:
                 await asyncio.sleep(Config.HEALTH_CHECK_INTERVAL)
-
                 if self.running:
                     health_status = await self.failsafe.check_system_health(
                         trader=self.trader,
@@ -162,16 +141,13 @@ class TradingBotApp:
 
                     if not health_status["healthy"]:
                         await self.telegram_bot.send_health_alert(health_status)
-
                         if health_status["critical"]:
                             self.logger.critical("Critical system health issue detected, stopping bot")
                             await self.stop()
-
             except Exception as e:
                 self.logger.error(f"Error in system health monitoring: {e}")
 
-    async def _get_system_status(self):
-        """Get comprehensive system status"""
+    async def _get_system_status(self) -> dict:
         try:
             account_info = await self.fxopen_handler.get_account_info()
             earnings = await self.earnings_tracker.get_current_performance()
@@ -192,21 +168,17 @@ class TradingBotApp:
             self.logger.error(f"Error getting system status: {e}")
             return {"error": str(e)}
 
-    async def stop(self):
-        """Gracefully stop the trading bot"""
+    async def stop(self) -> None:
         self.logger.info("Stopping AI Trading Bot...")
         self.running = False
 
         try:
-            # Close all open positions if configured
             if Config.CLOSE_POSITIONS_ON_STOP:
                 await self.trader.close_all_positions()
 
-            # Send shutdown notification
             if self.telegram_bot:
                 await self.telegram_bot.send_shutdown_notification()
 
-            # Stop components
             if self.trader:
                 await self.trader.stop()
 
@@ -218,10 +190,8 @@ class TradingBotApp:
         except Exception as e:
             self.logger.error(f"Error during bot shutdown: {e}")
 
-    def setup_signal_handlers(self):
-        """Setup signal handlers for graceful shutdown"""
-
-        def signal_handler(signum, frame):
+    def setup_signal_handlers(self) -> None:
+        def signal_handler(signum, frame) -> None:
             self.logger.info(f"Received signal {signum}, initiating shutdown...")
             asyncio.create_task(self.stop())
 
@@ -229,15 +199,11 @@ class TradingBotApp:
         signal.signal(signal.SIGTERM, signal_handler)
 
 
-async def main():
-    """Main entry point"""
+async def main() -> None:
     bot_app = TradingBotApp()
 
     try:
-        # Setup signal handlers
         bot_app.setup_signal_handlers()
-
-        # Initialize and start bot
         await bot_app.initialize()
         await bot_app.start()
 
